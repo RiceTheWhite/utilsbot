@@ -4,8 +4,10 @@ import discord
 from discord import app_commands
 import os
 from jsonHandler import JsonHandler
+from dotenv import load_dotenv, dotenv_values
+load_dotenv()
 
-MY_GUILD = discord.Object(id=1382525385803305030)  # replace with your guild id
+MY_GUILD = discord.Object(id=1071479459498164459)  # replace with your guild id
 
 
 class MyClient(discord.Client):
@@ -31,14 +33,23 @@ def has_manage_roles():
         return interaction.user.guild_permissions.manage_roles
     return app_commands.check(predicate)
 
+def has_ban_perms():
+    async def predicate(interaction: discord.Interaction) -> bool:
+        return interaction.user.guild_permissions.ban_members
+    return app_commands.check(predicate)
+
+
 @client.event
 async def on_ready():
     print(f'Logged in as {client.user} (ID: {client.user.id})')
     print('------')
 
 
-jsonHandler = JsonHandler(filename="save.json")
-reaction_role_map = jsonHandler.map
+reactionMapHandler = JsonHandler(filename="save.json")
+reaction_role_map = reactionMapHandler.map
+
+
+
 
 # @client.event
 # async def on_message(message):
@@ -70,7 +81,7 @@ async def add_reaction_role(
         reaction_role_map[message_id] = {}
 
     reaction_role_map[message_id][emoji] = role.id
-    jsonHandler.save()
+    reactionMapHandler.save()
 
     # Try to react to the message
     try:
@@ -103,17 +114,17 @@ async def remove_reaction_role(
         await interaction.response.send_message("Invalid message ID.", ephemeral=True)
         return
 
-    mapping = jsonHandler.map.get(message_id_int)
+    mapping = reaction_role_map.get(message_id_int)
     if not mapping or emoji not in mapping:
         await interaction.response.send_message("❌ No such reaction-role mapping found.", ephemeral=True)
         return
 
     # Remove mapping
-    del jsonHandler.map[message_id_int][emoji]
-    if not jsonHandler.map[message_id_int]:  # clean up empty dicts
-        del jsonHandler.map[message_id_int]
+    del reaction_role_map[message_id_int][emoji]
+    if not reaction_role_map[message_id_int]:  # clean up empty dicts
+        del reaction_role_map[message_id_int]
 
-    jsonHandler.save()
+    reactionMapHandler.save()
 
     # Try to remove the reaction
     try:
@@ -162,5 +173,60 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
         )
     else:
         raise error  # Re-raise unhandled exceptions
+
+
+@client.tree.command(name="warn", description="Warns a user.")
+@has_ban_perms()
+async def warn(
+    interaction: discord.Interaction,
+    user: discord.User,
+    message: str
+):
+    try:
+        await user.send(f"⚠️ You have been warned in **{interaction.guild.name}** for: {message}")
+    except discord.Forbidden:
+        print("❌ Could not DM the user. They may have DMs closed.")
+
+    await interaction.response.send_message(f"✅ {user.mention} has been warned for: `{message}`", ephemeral=False)
+
+
+@client.tree.command(name="mute", description="Mutes a user by assigning a 'Muted' role.")
+@has_ban_perms()
+async def mute(
+    interaction: discord.Interaction,
+    user: discord.Member,  # note: must be Member to modify roles
+    message: str
+):
+    muted_role = discord.utils.get(interaction.guild.roles, name="Muted")
+    if not muted_role:
+        await interaction.response.send_message("❌ 'Muted' role not found. Please create one first.", ephemeral=True)
+        return
+
+    try:
+        await user.add_roles(muted_role, reason=message)
+        await user.send(f"🔇 You have been muted in **{interaction.guild.name}** for: {message}")
+        await interaction.response.send_message(f"✅ {user.mention} has been muted for: `{message}`", ephemeral=False)
+    except discord.Forbidden:
+        await interaction.response.send_message("❌ I do not have permission to mute this user.", ephemeral=True)
+
+
+@client.tree.command(name="ban", description="Bans a user.")
+@has_ban_perms()
+async def ban(
+    interaction: discord.Interaction,
+    user: discord.User,
+    message: str
+):
+    try:
+        await interaction.guild.ban(user, reason=message)
+        await interaction.response.send_message(f"✅ {user.mention} has been banned for: `{message}`", ephemeral=False)
+
+        try:
+            await user.send(f"⛔ You have been banned from **{interaction.guild.name}** for: {message}")
+        except discord.Forbidden:
+            pass  # user may have DMs closed
+    except discord.Forbidden:
+        await interaction.response.send_message("❌ I do not have permission to ban this user.", ephemeral=True)
+
 
 client.run(os.environ["TOKEN"])
