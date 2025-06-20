@@ -516,16 +516,16 @@ class TicketView(discord.ui.View):
 
         embed = discord.Embed(
             description=
-                "────˚₊‧꒰ა ୨ৎ ໒꒱ ‧₊˚────\n"
-                "\n"
-                f"thanks for opening a ticket with us, {user.mention}! please give us your intro and a cupid will be with you shortly!\n"
-                "\n"
-                "────˚₊‧꒰ა ୨ৎ ໒꒱ ‧₊˚────",
+            "────˚₊‧꒰ა ୨ৎ ໒꒱ ‧₊˚────\n"
+            "\n"
+            f"thanks for opening a ticket with us, {user.mention}! please give us your intro and a cupid will be with you shortly!\n"
+            "\n"
+            "────˚₊‧꒰ა ୨ৎ ໒꒱ ‧₊˚────",
             color=discord.Color(int("#D5B9BA".strip("#"), 16))
         )
         embed.set_footer(text=f"User ID: {user.id}")
 
-        await ticket_channel.send(content = f"{user.mention}", embed=embed, view=CloseTicketView())
+        await ticket_channel.send(content=f"{user.mention}", embed=embed, view=CloseTicketView())
 
         await interaction.response.send_message(f"✅ Ticket created: {ticket_channel.mention}", ephemeral=True)
 
@@ -575,6 +575,7 @@ async def archive_ticket(interaction: discord.Interaction, reason: str):
     await interaction.channel.send(f"🗃️ This ticket has been archived.\n**Reason**: {reason}")
     await interaction.response.send_message("✅ Ticket archived.", ephemeral=True)
 
+
 # ---------------------------
 # SAY
 # ---------------------------
@@ -583,6 +584,7 @@ async def archive_ticket(interaction: discord.Interaction, reason: str):
 @has_ban_perms()
 async def say(interaction: discord.Interaction):
     await interaction.response.send_modal(SayModal())
+
 
 class SayModal(discord.ui.Modal, title="make tamako say sum"):
     message = discord.ui.TextInput(
