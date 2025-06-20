@@ -7,7 +7,7 @@ from jsonHandler import JsonHandler
 from dotenv import load_dotenv, dotenv_values
 load_dotenv()
 
-MY_GUILD = discord.Object(id=1071479459498164459)  # replace with your guild id
+MY_GUILD = discord.Object(id=os.environ["GUILD_ID"])  # replace with your guild id
 
 
 class MyClient(discord.Client):
