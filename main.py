@@ -229,4 +229,112 @@ async def ban(
         await interaction.response.send_message("❌ I do not have permission to ban this user.", ephemeral=True)
 
 
+welcomeHandler = JsonHandler("welcome.json")
+welcome_config = welcomeHandler.map
+
+class WelcomeMessageModal(discord.ui.Modal, title="Set Welcome Message"):
+    def __init__(self, channel: discord.TextChannel):
+        super().__init__()
+        self.channel = channel
+
+        self.message_input = discord.ui.TextInput(
+            label="Welcome Message",
+            style=discord.TextStyle.paragraph,
+            placeholder="Use {user} to mention the new member.",
+            required=True,
+            max_length=1000
+        )
+        self.color_input = discord.ui.TextInput(
+            label="Embed Color (hex, e.g. #00ffcc)",
+            style=discord.TextStyle.short,
+            required=False,
+            placeholder="#00ffcc"
+        )
+        self.gif_input = discord.ui.TextInput(
+            label="GIF/Image URL (optional)",
+            style=discord.TextStyle.short,
+            required=False,
+            placeholder="https://example.com/image.gif"
+        )
+
+        self.add_item(self.message_input)
+        self.add_item(self.color_input)
+        self.add_item(self.gif_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        guild_id = str(interaction.guild.id)
+
+        # Parse color
+        color_hex = self.color_input.value.strip() or "#00ffff"
+        try:
+            color = discord.Color(int(color_hex.strip("#"), 16))
+        except ValueError:
+            await interaction.response.send_message("❌ Invalid color hex. Use format like #00ffcc.", ephemeral=True)
+            return
+
+        # Basic GIF URL validation
+        gif_url = self.gif_input.value.strip()
+        if gif_url and not (gif_url.startswith("http") and any(gif_url.endswith(ext) for ext in [".gif", ".png", ".jpg", ".jpeg", ".webp"])):
+            await interaction.response.send_message("❌ Invalid image URL.", ephemeral=True)
+            return
+
+        message = self.message_input.value
+
+        # Save config
+        welcome_config[guild_id] = {
+            "channel_id": self.channel.id,
+            "message": message,
+            "color": color.value,
+            "gif_url": gif_url
+        }
+        welcomeHandler.save()
+
+        # Build and send embed
+        preview = message.replace("{user}", interaction.user.mention)
+        embed = discord.Embed(description=preview, color=color)
+        if gif_url:
+            embed.set_image(url=gif_url)
+
+        try:
+            await self.channel.send(embed=embed)
+            await interaction.response.send_message(
+                f"✅ Welcome embed configured for {self.channel.mention}.", ephemeral=True
+            )
+        except discord.Forbidden:
+            await interaction.response.send_message(
+                "❌ I couldn't send the embed in that channel. Check my permissions.", ephemeral=True
+            )
+
+
+@client.tree.command(name="welcome", description="Set up the welcome message with embed.")
+@has_ban_perms()
+async def welcome(interaction: discord.Interaction, channel: discord.TextChannel):
+    await interaction.response.send_modal(WelcomeMessageModal(channel))
+
+
+@client.event
+async def on_member_join(member: discord.Member):
+    guild_id = str(member.guild.id)
+    config = welcome_config.get(guild_id)
+    if not config:
+        return
+
+    channel = member.guild.get_channel(config["channel_id"])
+    if not channel:
+        return
+
+    color = discord.Color(config.get("color", 0x00FFFF))
+    message = config.get("message", "Welcome {user}!").replace("{user}", member.mention)
+    gif_url = config.get("gif_url")
+
+    embed = discord.Embed(description=message, color=color)
+    if gif_url:
+        embed.set_image(url=gif_url)
+
+    try:
+        await channel.send(embed=embed)
+    except discord.Forbidden:
+        pass
+
+
 client.run(os.environ["TOKEN"])
