@@ -531,6 +531,7 @@ class TicketView(discord.ui.View):
 
 
 @client.tree.command(name="create_ticket_message", description="Create a ticket embed with a button.")
+@has_ban_perms()
 async def create_ticket_message(interaction: discord.Interaction):
     await interaction.response.send_modal(TicketModal())
 
@@ -573,6 +574,54 @@ async def archive_ticket(interaction: discord.Interaction, reason: str):
 
     await interaction.channel.send(f"🗃️ This ticket has been archived.\n**Reason**: {reason}")
     await interaction.response.send_message("✅ Ticket archived.", ephemeral=True)
+
+# ---------------------------
+# SAY
+# ---------------------------
+
+@client.tree.command(name="say", description="make tamako say sum")
+@has_ban_perms()
+async def say(interaction: discord.Interaction):
+    await interaction.response.send_modal(SayModal())
+
+class SayModal(discord.ui.Modal, title="make tamako say sum"):
+    message = discord.ui.TextInput(
+        label="Message",
+        placeholder="What should Tamako say?",
+        style=discord.TextStyle.paragraph,
+        required=True,
+        max_length=1000
+    )
+
+    embed_color = discord.ui.TextInput(
+        label="Embed Color (Hex, optional)",
+        placeholder="#5865F2 or leave blank",
+        required=False
+    )
+
+    gif_link = discord.ui.TextInput(
+        label="GIF/Image URL (optional)",
+        placeholder="https://media.giphy.com/media/abc123.gif",
+        required=False
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        # Default color: #D5B9BA
+        try:
+            color = int(self.embed_color.value.lstrip('#'), 16) if self.embed_color.value else 0xD5B9BA
+        except ValueError:
+            await interaction.response.send_message("❌ Invalid hex color code.", ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            description=self.message.value,
+            color=color
+        )
+
+        if self.gif_link.value:
+            embed.set_image(url=self.gif_link.value)
+
+        await interaction.response.send_message(embed=embed)
 
 
 # ---------------------------
